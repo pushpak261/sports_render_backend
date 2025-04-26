@@ -1,0 +1,324 @@
+
+After AwsS3
+
+Product & order Service
+----
+
+ProductService.java
+method to create a product, update a product, delete a product, get a product by Id, get all products, get product by category,
+search product.
+
+
+ProductServiceImpl.java
+It implements ProductService interface which contain all methods. and we are using that methods in implementation.
+
+
+
+Now write service to create and manage orders
+
+OrderItemService.java
+method to place order, update order item status, filter order items,
+
+
+OrderItemServiceImpl.java
+implements OrderItemService interface it contains methods and that methods we are going to be using in impl.
+
+inject orderRepo, orderItemRepo, productRepo, userService, entityDtoMapper.
+
+Note:
+User can make an order with one item or with multiple items.
+An Order contains an order items and an amount. go to OrderRequest dto.
+
+so to place an order we are going to first of all go over the order request, loop over all the order items and get the
+products from the productId, package it together and make and save the data on our backend.
+
+So before we do that, let me just make sure that a user is the one placing an order.
+go to Order entity .
+getting the actual product that the user is ordering.
+
+the total price is coming from order request.
+
+
+
+Controllers
+---
+
+AuthController.java
+when the user go to the auth then you should come to this controller and check the endpoints at the same time.
+Bringing a userService inject it. what we are going to do here is register or login a user.
+create a method to register a user.
+Response is from our dto.
+
+Note:
+In security config we can see that auth is already been permitted. we can see that you dont need authenticate to access this slash
+auth endpoint. so when a user goes to your url slash auth and everything that comes after, it is going to allow the user to go
+without having to authenticate the user.
+
+now create a method for loginUser.
+
+
+UserController.java
+
+Note:
+In security config we can see the users endpoint is not permitted to accessed publicy.
+so that means you need to authenticated to access the users endpoint. so any endpoint we have here, you may need to be authenticated before you are allowed to access it.
+
+hasAuthority('ADMIN') : Only Admin has the permission to access it endpoint.
+If you are authenticated as a user you will not be able to access this endpoint.
+
+Lets have the implementation for a user to get his own details.
+We want a user to be able to get his information, including the other history that users have made.
+
+
+AddressController.java
+@RequiredArgsConstructor is used to inject my dependency
+inject addressService
+Create a method to save and update an address.
+So for you to access this endpoint you must be authenticated. Bcz in the configuration we are seeing that this ./address is not permitted to the public. so you need to be authenticated
+before you can save and access address for yourself.
+
+
+CategoryController.java
+inject categoryService
+create a method to createCategory in this i want admin to be able to only access this endpoint so use PreAuthorize.
+create a method to getAllCategories, updateCategory, deleteCategory, getCategoryById
+
+
+ProductController.java
+inject productService
+method to createProduct, updateProduct, deleteProduct, getProductById, getAllProducts, getProductsByCategory, searchForProduct
+
+
+OrderItemController.java
+This is going to be used to handle our orders.
+inject orderItemService
+let have method to placeOrder, updateOrderItemStatus, filterOrderItems
+
+-----X-----X--------X--------
+
+
+
+Testing
+--
+User entity, User dto
+
+If we dont pass a role its going to be by default a User.
+
+
+PostMan:
+--
+POST  localhost:2424/auth/register
+Select Body.
+
+{
+"email" : "jayant@gmail.com",
+"name" : "jayant",
+"phoneNumber" : "9923676855",
+"password" : "jayant"
+
+//"role" : "USER" //user registration
+}
+
+{
+"email" : "pushpak@gmail.com",
+"name" : "pushpak",
+"phoneNumber" : "9923676866",
+"password" : "pushpak",
+
+"role" : "ADMIN" //admin registration
+}
+
+
+
+POST  localhost:2424/auth/login
+
+{
+"email" : "jayant@gmail.com",  //user
+"password" : "jayant"
+}
+
+{
+"email" : "pushpak@gmail.com",  //admin
+"password" : "pushpak"
+}
+
+
+
+copy token of admin and try to access an admin endpoint.
+
+GET  localhost:2424/user/get-all
+Select Bearer Token from Auth Type and paste admin token.
+
+
+
+GET  localhost:2424/user/my-info
+In Authorization select Bearer Token and paste admin token.
+
+
+
+POST  localhost:2424/category/create
+In Authorization select bearer token and put admin token in it.
+Go to the Body.
+
+{
+"name" : "Shoes"
+}
+
+
+
+GET  localhost:2424/category/get-all
+In Authorization select Bearer Token and paste admin token.
+
+
+
+PUT  localhost:2424/category/update/1
+In Authorization select Bearer Token and paste admin token.
+In Body select raw.
+
+{
+"name" : "cricket"
+}
+
+
+
+GET  localhost:2424/category/get-category-by-id/1
+In Authorization select Bearer Token and paste admin token.
+
+
+
+DELETE  localhost:2424/category/delete/1
+In Authorization select Bearer Token and paste admin token.
+
+
+//Category End Points Works Fine
+
+
+
+POST  localhost:2424/address/save
+This can be used to create and update address.
+In Authorization select Bearer Token and paste user token.
+Go to Body then go to raw and put it in information
+
+{
+"street" : "778 HighLand",
+"city" : "Pune",
+"state" : "Maharashtra",
+"zipcode" : "411033",
+"country" : "India"
+}
+
+
+//auth, users, category, address works well.
+
+
+
+POST  localhost:2424/product/create
+In authorization select Bearer Token and paste admin token.
+Now in Body select form-data
+
+Add key, value, Description
+
+Key               Value
+categoryId       1
+image
+name              Willow Wooden Cricket Bat
+description       Perfect bat for the modern day batsmen.
+price             950
+
+
+
+GET  localhost:2424/product/get-all
+You dont need authorization this would accessible publicly.
+You see all products.
+
+
+
+GET  localhost:2424/product/search
+
+key            value
+searchValue    Willow Wooden Bat
+
+
+
+Look apis in controllers
+
+PUT  localhost:2424/product/update
+In authorization select Bearer Token and paste admin token.
+In Body select www-form-urlencoded
+
+Key          Value
+name         Willow Wooden Cricket Bat
+productId    1
+
+
+
+Look api in Product Controller
+
+DELETE  localhost:2424/product/delete/1
+In authorization select Bearer Token and paste admin token.
+
+
+
+GET  localhost:2424/product/get-by-category-id/1
+
+
+//category endpoints works fine
+
+
+
+//Look OrderItemController -> OrderRequest -> OrderItemRequest
+
+POST  localhost:2424/order/create
+In authorization select Bearer Token and paste user token.
+Go to body then raw.
+
+{
+"items" : [
+  {
+   "productId" : 1,
+   "quantity" : 5
+  }
+  ]
+}
+
+
+
+GET  localhost:2424/order/filter
+In authorization select Bearer Token and paste admin token.
+
+
+
+GET  localhost:2424/order/filter
+In authorization select Bearer Token and paste admin token.
+Select Params
+
+Key        Value
+itemId     1
+
+
+
+GET  localhost:2424/order/filter
+In authorization select Bearer Token and paste admin token.
+select Params
+
+Key        Value
+status     pending
+
+
+
+PUT  localhost:2424/order/update-item-status/1
+In authorization select Bearer Token and paste admin token.
+select Params
+
+Key        Value
+status     CONFIRMED
+
+
+IF address is not showing go to the EntityDtoMapper and check.
+or Look at the User entity for address.
+
+
+--------
+stage 7 END
+---------BackEnd Completed-------------
+

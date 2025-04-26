@@ -1,0 +1,581 @@
+
+
+
+
+
+First we create spring project by spring initializer
+
+Project -> Gradle
+Language -> Java
+Spring Boot -> 3.3.5
+
+Project Metadata
+---
+Group : com.ecommerce
+Artifact : sportshub
+Name : sportshub
+Description : Project on Sports Accessories
+Package name : com.ecommerce.sportshub
+Packaging : Jar
+Java : 21
+
+Dependencies
+---
+Spring Web
+Lombok
+MYSQL Driver
+Spring Data JPA
+Spring Security
+Validation
+
+then we open project on Intellij Idea or any other IDE
+
+=============
+
+Now we have to add some extra dependencies since we are going to be making use of AWS S3 Bucket.
+and also dependency for our JSON web token.
+jwt impl, jwt api, jwt jackson.
+
+jwt dependency is used for generating token.
+
+Now configure application.properties in this we write database connectivity.
+
+
+LinuX Configuration:
+---
+sudo apt-get update
+sudo apt-get install mysql-server
+sudo systemctl status mysql
+
+sudo mysql
+
+First create database in mysql
+
+create package structure:
+---
+controller
+dto
+enums
+exception
+mapper
+repository
+security
+service
+specification
+
+
+Entity, Dto, Repository
+----
+first create entity
+
+
+In entity create User
+--
+User.java
+@Data is going to help to generate getters setters rather than writing it manually.
+Table name is users
+
+User is going to have id, name, email, password, phoneNumber, role, orderItemList, address, createdAt
+address is going to be one to one relationship. That means user is going to have an address. An address is going to belong to a user.
+
+CascadeType.All means whenever a user is deleted the address of that user is going to be deleted. Whenever the address of a user is updated is going to reflect on the user.
+Now add one to many relationship to the order items. That means a user can have many orders.
+
+Add some validations for name, phone number, password, email
+
+
+UserRole.java
+In enums create UserRole : ADMIN, USER
+
+
+OrderStatus.java
+In enums create OrderStatus : PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED
+
+
+Address.java
+Now we are going to have Address entity
+Address is going to have id, street, city, state, zipCode, country, user, createdAt
+For the user I am going to have many to one relationship. user Id is going to have a relationship to the user.
+
+
+Category.java
+Category is going to have fields like id, name, productList, createdAt.
+we dont have 2 different categories with the same name so we make it unique to be True.
+After this we are going to also map this to a product. We also want to be able to get the products from this category.
+
+
+Product.java
+Product is going to have fields like id, name, description, imageUrl, price, category, createdAt.
+We are going to be storing our image ang going to store the URL here in our database.
+The product belongs to category.
+The date , time the product was created.
+Category is going to have our relationship many to one. That means many products belong to one category and a category can have many products.
+cascadeType.ALL means if a category is deleted, the products within it should also be removed. and if a product is updated it should reflect in our category.
+
+
+Order.java
+Order is going to have fields like id, totalPrice, orderItemList, createdAt.
+id is a primary key.
+For each order we are going to have the total price.
+The date in which item was created which is going to be createdAt.
+we are going to have one to many relationship that means one order have multiple order items. eg: see in cart page.
+cascade means that if you delete an order, its going to delete the order items. if you have an order items its going to reflect in the order.
+we can have our payment as well bcz we are making an order.
+//Payment
+
+
+OrderItem.java
+OrderItem is going to have fields like id, quantity, price, status, user, product, order, createdAt.
+Primary key is generated using the identity strategy.
+An order item has an quantity.
+For each order is going to have an OrderStatus.
+User is going to be the one making an order. and it can have many to one relationship means many order items can a user order.
+Product is what user is ordering. An order item is going to have product bcz we are actually ordering a product here. We have many to one relationship means one product can have multiple orders.
+An order item is going to have an order.
+
+
+Payment.java
+Table name
+Payment is going to have fields like id, amount, method, status, order, createdAt.
+If you are creating an order and you are checking out an order, you should make payment. So for a payment we are going to check which order it was paid for.
+we are going to have one to one relationship means one order can have one payment.
+
+
+Review.java
+Table name
+Review is going to have fields like id, content, rating, product, user, createdAt.
+For each product we want a user to be able to give feedback.
+Content is basically the description of the user.
+We are going to have many to one relationship that means a product can have multiple reviews.
+We are also going to have a relationship for user which is many to one and at the same time a user is going to be the one making a user.
+LocalDateTime which will detect at which date review was created.
+
+-----X----X-----X-----
+
+
+
+Now we are going to proceed to write our DTO.
+
+AddressDto.java
+AddressDto is going to have properties like id,  street, city, state, zipcode, country.
+We dont want to return this so for that we dont want to return this address as it is.
+so we want to have an DTO which is basically, you know, return.
+
+
+CategoryDto.java
+CategoryDto is going to have field like id, name, productList
+@Data helps to generate our getter and setters.
+@JsonInclude is going to ignore properties of fields that are null.
+@AllArgsConstructor is helping to auto generate constructor.
+@NoArgsConstructor in case we dont have constructor NoArgsConstructor is going to be called.
+
+
+OrderDto.java
+OrderDto is going to have properties like id, totalPrice, createdAt, orderItemList.
+when we are creating an order, we just pass in the total price and order value.
+
+
+OrderItemDto.java
+OrderItemDto is going to have properties like id, quantity, price, status, user, product, createdAt
+We are going to have quantity of product you want to order, price and status of the products, the date the products was created.
+
+
+ProductDto.java
+ProductDto is going to have fields like id, name, description, price, imageUrl, category.
+
+
+UserDto.java
+UserDto is going to have fields like id, email, name, phoneNumber, password, role, orderItemList, address
+
+Note:
+As we saw earlier we dont want to return the entity directly. So we want to map the entity to a DTO so we can easily control the date and kind of data that we need to output to a user.
+For Eg: For the user  we can see over here in the user entity we are going to be having a password. And if I return this entity directly we are going to be returning the user's passwords as well.
+But If I create an Dto of this and have a passwd, i can decide not to add the password fields over here. So I can decide to ignore this and just pass the necessary data that i need. So that the purpose of having Dto for each entity.
+
+Now next we are going to create a response, a generic class for all our response. I dont want us to have an address response, a category.
+I just want to have a generic response which we are going to be using to output all our responses.And that response is going to have some properties and some fields.
+
+
+Response.java
+Response is going to have fields like status, message, timestamp, token, role, expirationTime, totalPage, totalElement, address, user, userList, category, categoryList, product, productList, orderItem, orderItemList, order, orderList
+@JsonInclude so what it does is that whatever properties we have here that doesnt have a value, we re going to ignore it.
+
+Lets have HTTP status for every of our response. we want to have a status code. If its successful. If its not successful its an error. we want to have a status code.
+And also have the date in which such request was sent out. timestamp.
+So for every req I'm returning, I'm adding a timestamp to it.
+
+No i am going to have Order field so this is going to be to when the user is successfully logged in. We want to have a token, to return a token. So this field is going to be used to capture the token that was generated by the user. So lets do it to capture the role and
+also use this to capture the expiration time.
+Next we want to create another properties to capture the total pages and the total elements Bcz in this application we are going to be using pagination.
+
+We want to use pagination to select some certain data and return it on the on demand. So when we decide to use that we are going to be needing a page.
+
+If we decide to return an address, lets just call the address. and if we decide to return a user data we are going to capture the user data (userDto)
+If we want to return a list of users we are just going to call that user list.
+At the same time we can return a category and categoryList. Same for product, orderItem and order.
+
+Note:
+So this is going to be our Generic Response class.
+And for every response we want to pass in the status of that response the message and the timestamp.
+And since this is going to be our generic response class @JSON, ignore is going to be used to whatever value that is not present here we are not going to be sending it.
+For EG: if we are using this response to login a user we are only going to be expecting the status, message, timestamp, the token, the role and the expiration time.
+We are not going to be expecting the totalPage, category and so bcz we have our JSON ignore over here its going to ignore these other fields that are not necessary.
+At the same time if I am using this Response class to return lets say category is going to ignore these other fields that are null. So this is our generic response class.
+
+
+LoginRequest.java
+LoginRequest is going to have fields such as email and passwords and both fields are validated.
+Login body - pass email and password to login .
+
+
+OrderRequest.java
+OrderRequest is going to have fields like totalPrice, items, paymentInfo.
+//Create a body to be used to create an order
+//If I click on checkOut in cart page I am going to bundle this data and I am going to calculate the total prices of all the data.
+//And I am going to bundle them into an object & I am going to send it to the backend to create an order
+
+So lets Create a class to be able to handle the data that is going to be used to create an order.
+
+@JSON - so what it does if we are using this as our request, whatever fields are not passed in is going to be ignored.
+Lets have a list of our orderItem. I am going to create an OrderItemRequest and lets just call this as items.
+
+Note:
+This class is going to collect data which is the totalPrice and each individual item is going to go over the order item req, which is going to be the List of items and the payment.
+
+
+OrderItemRequest.java
+OrderItemRequest is going to have fields like productId and quantity
+Now lets create order item req here
+
+Note:
+Our order item req is going to be each of this product here we are going to pass in the ID and the quantity of the product. Eg: In cart page
+it is feed into Order.java
+
+-----X----X-----X-----
+
+
+Lets Proceed to write our Repositories
+
+AddressRepo.java
+This is going to be interface which extends JPA Repository and we are passing Address entity and the data type of my primary key which is a long.
+
+
+CategoryRepo.java
+This is an interface which extends JPA Repository and we are passing category entity and the primary key of that entity which is a long.
+
+
+OrderItemRepo.java
+which is an interface and this extends JPA Repo and its going to take our OrderItem as entity and the primary key of that entity is long and
+also for this I am going to using a specification which is our JPA specification which is going to pass in taking our order item.
+
+Note:
+Specification are kind of used to create custom query in a more flexible way. So it helps to create search queries on a given condition.
+Advantages: It helps to reduce in and helps to shorten your code. It helps to create reusable codes.
+Eg: Go to OrderItem entity. If I want to search an order by status, by userId, by product, by order i want to search an order by this fields. By using JPA
+specification. I can just have one method which I can use to search by status, by user, or both of them, or product or both. Just one method provided that you pass in either of them.
+So whatever you pass in is going to take that off and help you to filter. so that's what specification does.
+
+
+OrderRepo.java
+This is an interface which extends JPA Repository and we are passing out order entity and the primary key of this entity will be long.
+
+Note:
+Difference between Order and OrderItem;
+So an orderItem is basically a product. Eg: In cart page each individual item in your order is an order item is basically a product that is being ordered. so thats an order item where an order is a
+collection of order items.. like this is an order which has 4 or many order items  and each of these is an order item.
+
+
+ProductRepo.java
+This is an interface which extends JPA Repository and we are passing Product entity and the primary key of this entity is long.
+In this we are going to have methods to search. Eg: I want to find all the products by categoryId so I can just say method findByCategory and pass fields like categoryId and datatype as long.
+And we also need to search our products by name and description. so we have a method findByNameOrDescriptionContaining and pass fields like name and description in it from product entity.
+//So with this JPA automatically going to search for a product that has name containing. Eg:Lets say I have a product whose name is vegan is a product. So with this if I pass ve like without passing full name completely its going to search a product that contains that name.
+//Follow the naming convention as this is a JPA naming convention.
+
+
+UserRepo.java
+This is an interface which extends JPA Repository and we are passing User entity and the primary key is Long.
+Here we use Optional for User. findByEmail method and pass email as a string in it. I am going to use this method to search user by email. as email is going to be the primary key of a user.
+
+
+
+=========================
+Exceptions and Custom Mappings
+--
+
+Lets create exception handling
+
+NotFoundException.java
+This is an class which extends RuntimeException
+Inside it create a constructor named NotFoundException and its going to take in a string of our message.
+and inside super pass message.
+
+
+InvalidCredentialsException.java
+This is an class which extends RuntimeException
+Inside it create a constructor named InvalidCredentialsException which takes in a message, and which is what we are going to be passing in.
+and I am going to have a super of the message.
+
+
+GlobalExceptionHandler.java
+@ControllerAdvice - so what this does is this is going to intercept any error that has been thrown in our application.
+So whatever we have error being thrown is going to be intercepted by our global exception handler. and its going to return that error.
+
+First return ResponseEntity of response. we already have response which we are using here. so lets use that to return a response. handleAllException is going to take in a exception and going to take in a web request.
+response going to build my response object.
+
+Here we are using NotFound and InvalidCredentialsException
+
+3 methods in Global : handleALlException, handleNotFoundException, handleInvalidCredentialsException.
+
+So if you are trying to authenticate and your credentials are invalid we are going to be using InvalidCredentialException method.
+
+-----X----X-----X-----
+
+Now we are going to proceed to write our mapping.
+
+Note:
+in earlier we have entity, dto. and we dont return entity directly. we instead convert those entity to DTO.
+For eg: If I register a user and If I want to get a user detail from the database, I am going to have a user entity and going to map this to a user dto.
+and in user dto we have fields and in entity we have these fields and we have the password. and most times we will not want to add a password to the data
+to return.
+So we have to map it so we can select the fields we need and get rid of the fields we dont need.
+To do that I am going to be making use of a custom mapping class.
+
+
+EntityDtoMapper.java
+@Component - Annotate class with Component as we are going to be using it in other place.
+
+//Create a method to map the User.
+over here to map a user entity to a user DTO.
+Id, PhoneNumber, Email, role, Name.  mapUserToDtoBasic
+
+//Map Address to AddressDto.
+Id, City, Street, State, Country, ZipCode. mapAddressToDtoBasic
+
+//Method to map Category to the CategoryDto
+Id, Name.   mapCategoryToDtoBasic
+
+//Method to convert an Item to an OrderItemDto.
+Id, Quantity, Price, name, CreatedAt.   mapOrderItemToDtoBasic
+
+//Map product to ProductDto
+Id, Name, Description, Price, ImageUrl.   mapProductToDtoBasic
+
+//Map user to UserDto
+Address.   mapUserToDtoPlusAddress
+
+//Map order item to OrderItemDto
+OrderItem, Product.   mapOrderItemToDtoPlusProduct
+using this you can get the order item plus the product only without the user who ordered the product.'
+
+//Map OrderItem to Dto plus product and user
+OrderItem, Product, User.    mapOrderItemToDtoPlusProduct
+using this method you can get an order item plus product and the user.
+
+//Map a user to get the address and the order history of that user.
+User, Address, Order History.   mapUserToDtoPlusAddressAndOrderHistory
+first we are mapping a user plus the address and we are seeing if this user have an order. if its not empty then we are just mapping it to assign this .setOrderItemList. and we are saying the user.getOrderItemList of order stream it map it
+collect the item and the products and the convert it to a list so we can add it to the user.getOrderItemList and return the user.
+So this is going to help get a user the address and the order history of that user.
+
+=========================
+
+Security Section
+-
+
+Security (jwt auth filter, jwt token,, security filter cors)
+
+Note:
+We can use the user data security implementation as wont be able to use this directly.
+We have the security dependency.
+Integrate with what entity has.
+
+
+AuthUser.java
+implement class with UserDetails and then just implement methods.
+getAuthorize, getPassword, getUsername(email), isAccountNonExpired, isAccountNonLocked, isCredentialsNonExpired, isEnabled.
+
+
+CustomUserDetailsService.java
+@RequiredArgsConstructor : Instead of Autowired used this to inject my dependency.
+Here we are going to implement the UserDetailService from the spring security I am going to implement the methods which is to load by username.
+inject userRepo.
+user obj is going to have userRepo and then use findByEmail which is defined in UserRepo and I am going to pass username inside it. As we saw earlier our username is going to be our email.
+An this email is going to be the unique identifier of the user terms.
+
+Note:
+JWT Utils Service is going to be used to generate and validate a token.
+
+JwtUtils.java
+set expiration time for our token. 6 months time.
+secreteJwtString is defined in application.properties.
+
+In application.properties define secreteJwtString (32 characters long)
+initialize secrete key by using @PostConstruct.
+What @PostConstruct does Whenever a bean obj is created it will run this code (init) and we are assign a value to this key
+
+//Now write a method to generate a token.
+and it is going to take an user and we are going to be generating a token for that user.
+
+Jwts is from the jsonwebtoken dependency
+.signWith(key) :
+is the algorithm over here which is this our secret string  where which we are using to create this key algorithm here. so thats going to be our signin key.
+
+Now lets write method to validate our token.
+This is going to be used to extract our username from a token in order to validate to verify a user.
+create a method call extractClaims and pass token, Claims in it. Claims is coming from jsonwebtoken.
+
+//Now write implementation to check token is valid. inside this pass token which i want to validate. then UserDetails as well.
+
+//Now we have a method to check token is expired or not.
+
+Note:
+JWT Auth Filter. This is going to be the entry point for our application. And its going to filter any req thats coming in.
+
+
+JwtAuthFilter.java
+extends with OncePerRequestFilter
+implement method which is doFilterInternal
+Inject jwtUtils and customUserDetailsService
+
+First of all extract token from our request.
+getTokenFromRequest method : whenever a user makes a call to our endpoint and it passes in an authorization over here in postman.bearer token.
+so we are going to accept this token and we are going to validate it to make sure that the token is coming from us.
+I am going to fetch the token from the header which is going to be request.getHeader() and the token is going to be saved at authorization.
+Eg: Postman - Authorization - Bearer Token - token - Headers
+
+
+SecurityConfig.java
+Inject JwtAuthFilter
+JwtAuthFilter will run before our security config. so whatever the results it gets is going to pass it over here to our SecurityConfig which is going to be the final security check.
+
+
+CorsConfig.java
+access/ deny permission of application.
+which method you would like to access specify in .allowedMethods
+As we want to access everything .. so specify .allowedOrigins("*")
+
+-----X----X-----X-----
+
+
+Specification, Users, Address & Category Service
+
+A Specification is used to make custom query in a more flexible way.
+
+In Address repo i dont want specification to filter data on this repo.
+But I want specification for OrderItem.
+
+
+OrderItemSpecification.java
+I am going to write 3 methods.
+one is going to get order item by status. The order is going to feed the order items by start date and end date.
+and another method to get order item by Id,
+you can also decide to go the traditional way of just without using specification.
+
+With this class we can decide to pass in a status, a start date, end date and an item ID at the same time.
+we are going to fetch the data that have a status, start date, end date, and item ID. we can also decide to pass one of this value.
+so instead of having a different query method where you have to set the status differently, where you have to search by start date and end date differently or you have to search by item ID differently.
+with this one class just pass all this data and its going to check if this is null. its going to ignore this if this is null. and like that if you have value its going to search and filter the data that meets this criteria.
+so thats what specification is all about.
+
+
+
+Note:
+Now we are going to have a method to add a user to log in, to register a user to get our users.
+Interface
+
+
+UserService.java
+Here I am going to have methods to register a user.
+So its going to return our generic response I am going to call it register user.
+and its going to take in a user dto i just called this registrationRequest.
+I am also going to have another method to login a user its going to take in loginRequest.
+I am going to have another method to get all users.
+and many more methods.
+
+getLoginUser -> for this method whenever a user is logged in the authentication of that user and the user details are going to be available within the context instance. so we can use this to get the current logged in user.
+These are all methods now we write implementation for this.
+
+
+UserServiceImpl.java
+This is the class which implements UserService interface.
+implements all the methods.
+DI : userRepo, passwordEncoder, jwtUtil
+
+Whenever the user is logged in we have to generate a token for that user.
+I am just going to have my entity DTO mapper which we are going to be using to create to map.
+
+If there is no role in registrationRequest by default, we are going to be setting the default role to be User.
+If there is a role and the role name is admin we are going to set the role to be admin.
+User is coming from entity.
+
+savedUser will return user for us.
+Now i am just going to map the user item which is going to be our userDto.
+So lets get the basic information of the user and lets return the response.
+
+So our registration implementation is completed.
+
+Now i am going with LoginImpl
+first get the user object.
+we are trying to log in a user. we just want to check if the email is present at first.
+If the email is actually present and we are getting the user information then let just check if the password is correct.
+
+getAllUsers :
+This is going to be only accessible by admin.and we are going to make our modification in our controller.
+
+getLoginUser :
+Here we are going to use authentication from spring security.
+
+getUserInfoAndOrderHistory :
+
+User service is completed.
+
+
+AddressService.java
+It is an interface and having a method to save and update an address.
+it takes AddressDto
+
+
+AddressServiceImpl.java
+it should be implement AddressService which is interface
+inject addressRepo and userService here.
+implement the methods which are present in interface.
+We want to get the current information of the logged in user.
+We want a user to be able to update his address only.
+For the address I want to collect the address of the current logged in user.
+User updated address or not . if condition.
+if the user does not have an address than the address entity will be created if user has an address then proceed to update an address.
+
+street, city, state, zipcode, country.
+
+
+CategoryService.java
+add category, update a category, get category and delete category.
+let create crud operations for that
+
+
+CategoryServiceImpl.java
+It should be implement CategoryService interface.
+inject DI categoryRepo, entityDtoMapper
+
+
+
+---
+
+<dependency>
+    <groupId>software.amazon.awssdk</groupId>
+    <artifactId>s3</artifactId>
+</dependency>
+<dependency>
+    <groupId>software.amazon.awssdk</groupId>
+    <artifactId>auth</artifactId>
+</dependency>
+
+
+Mysql workbench, mysql server download, visual C++ 2019.
+mysql -u root -p
+username : root
+password : cdac
+
+
